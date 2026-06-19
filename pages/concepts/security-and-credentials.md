@@ -1,6 +1,6 @@
 ---
 source: dam-agents/dam
-commit: c307f40480aa96788cb9c4f6a06f7e5b732e5bd7
+commit: 64df37d1d3d6e4dd337e55733a6a83e24e86c515
 files: [docs/architecture/security-and-credentials.md]
 updated: 2026-06-19
 ---
@@ -198,6 +198,26 @@ a verdict in the inbox (`docs/architecture/security-and-credentials.md:323-325 @
 This gate is how [skills](skills.md) that touch credentialed hosts get
 surfaced to a human.
 
+**ext_authz is the destination-side egress allowlist — passthrough is not a
+bypass.** The L4 "default chain (SNI miss) does TCP passthrough — the request
+reaches the upstream unchanged" line describes only that TLS is *not* terminated
+and *no* credential is injected on that chain; it does **not** mean the request
+is unauthorized. ext_authz "gates everything the gateway forwards on behalf of
+the agent … this is the destination-side egress gate"
+(`docs/architecture/security-and-credentials.md:93-96 @64df37d`), and it runs on
+the catch-all chain too — "the network filter on the catch-all chain sees SNI
+only" (`docs/architecture/security-and-credentials.md:330-331 @64df37d`). So an
+unknown SNI hits ext_authz, finds no matching egress rule, and fails closed
+(403) under `failure_mode_allow: false`
+(`docs/architecture/security-and-credentials.md:326 @64df37d`); the gateway
+never connects to or resolves it. The allowlist itself is driven from the
+per-host `injection-hosts` list (one `connection:<id>` egress rule per host),
+"there is no second source of truth"
+(`docs/architecture/security-and-credentials.md:216-217 @64df37d`). Net: the
+gateway will not resolve an attacker-controlled name for the agent, so the
+gateway-side DNS-resolution exfil channel is closed — **subject to the agent
+having no DNS path of its own, which the Contradiction above leaves unresolved.**
+
 ## The two layered boundaries
 
 The agent and the gateway sit on opposite sides of the credential boundary, so
@@ -208,13 +228,27 @@ they are gated by different mechanisms matched to different threat models
 - **Agent → paired gateway: kernel.** The per-pair `<id>-agent-egress`
   NetworkPolicy is the sole gate. The agent pod opts out of ambient mesh
   (`istio.io/dataplane-mode: none`) so the kernel sees real destination IPs
-  rather than HBONE tunnelled to ztunnel; the policy admits exactly the paired
-  gateway pod's Envoy port. DNS is not admitted (the gateway resolves external
-  names), and HBONE 15008 is not admitted — the agent never speaks it. Pair
-  pinning is structural: the pod-selector is the gateway pod itself, so a
-  compromised agent has no admitted IP-and-port to reach anything else
-  (`docs/architecture/security-and-credentials.md:81-86 @c307f40`,
-  `docs/architecture/security-and-credentials.md:368-378 @c307f40`).
+  rather than HBONE tunnelled to ztunnel; the policy admits the paired
+  gateway pod's Envoy port, and HBONE 15008 is not admitted — the agent never
+  speaks it. Pair pinning is structural: the pod-selector is the gateway pod
+  itself, so a compromised agent has no admitted IP-and-port to reach anything
+  else (`docs/architecture/security-and-credentials.md:81-86 @64df37d`,
+  `docs/architecture/security-and-credentials.md:368-378 @64df37d`).
+
+> **Contradiction:** the source doc disagrees with itself on whether the agent
+> egress NetworkPolicy admits **DNS (port 53)** — which is the crux of DNS-exfil
+> protection. The layered-enforcement bullet says the policy "admits exactly DNS
+> and the paired gateway pod's Envoy port"
+> (`docs/architecture/security-and-credentials.md:85 @64df37d`), whereas the
+> per-boundary detail says "DNS is not admitted — the agent addresses its gateway
+> by ClusterIP … anything in the pod that tries to resolve names directly fails
+> closed" (`docs/architecture/security-and-credentials.md:371-373 @64df37d`).
+> These cannot both hold: if 53 is admitted the agent can reach cluster DNS and
+> tunnel data out via crafted queries (a path that never touches the Envoy/
+> ext_authz gate, since DNS does not ride `HTTPS_PROXY`); if it is not, the
+> gateway is the only resolver and that channel is closed. Both statements carry
+> the same `Last verified: 2026-06-15` date in one file, so neither wins on
+> recency — flagged for `lint` to resolve against the rendered NetworkPolicy.
 - **api-server / controller → agent: kernel.** The chart-rendered
   `agent-ingress-platform-only` NetworkPolicy admits the agent port only from
   api-server pods (ACP/tRPC relay) and controller pods (idle-checker busy-probe).
