@@ -1,6 +1,6 @@
 ---
 source: dam-agents/dam
-commit: c307f40480aa96788cb9c4f6a06f7e5b732e5bd7
+commit: 9d1bc9990fba55f43d60b0aad453b188af5896a8
 files:
   - packages/controller/main.go
   - packages/controller/Dockerfile
@@ -19,7 +19,7 @@ files:
   - packages/controller/pkg/reconciler/status.go
   - packages/controller/pkg/reconciler/agent.go
   - packages/controller/pkg/config/config.go
-updated: 2026-06-19
+updated: 2026-06-22
 ---
 
 # controller (package)
@@ -67,11 +67,17 @@ this build (`pkg/crdcheck/crdcheck.go:23` @c307f40).
 
 ## Entrypoint and control loop (`main.go`)
 
-The binary loads config from env, builds in-cluster typed + dynamic clients
-(raising client-go's default QPS/Burst to 50/100), and fails fast on a stale CRD
-schema before doing anything else (`main.go:32` @c307f40, `:47` @c307f40,
-`:69` @c307f40). It then runs under **leader election** (a 15s Lease), so only
-one replica reconciles at a time (`main.go:74` @c307f40, `:82` @c307f40).
+The binary configures a JSON `log/slog` handler on **stderr** at the `LOG_LEVEL`
+level (`debug|info|warn|error`, default `info`) via `setupLogger()`, then loads
+config from env, builds in-cluster typed + dynamic clients (raising client-go's
+default QPS/Burst to 50/100), and fails fast on a stale CRD schema before doing
+anything else (`packages/controller/main.go:99-112` @9d1bc99, `:30-70` @9d1bc99).
+There is no audit trail — the controller acts only under its own ServiceAccount
+and carries no real actor. The binary registers no in-process OpenTelemetry SDK
+so the OTel Operator's eBPF auto-instrumentation sidecar can capture log records
+with trace correlation (`docs/architecture/logging.md:53-57 @9d1bc99`). It then
+runs under **leader election** (a 15s Lease), so only one replica reconciles at a
+time (`packages/controller/main.go:74` @9d1bc99).
 
 The elected leader's `run` wires the loop (`main.go:112` @c307f40):
 
