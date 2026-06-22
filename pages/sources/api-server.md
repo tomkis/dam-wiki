@@ -1,6 +1,6 @@
 ---
 source: dam-agents/dam
-commit: c307f40480aa96788cb9c4f6a06f7e5b732e5bd7
+commit: 9d1bc9990fba55f43d60b0aad453b188af5896a8
 files:
   - packages/api-server/src/index.ts
   - packages/api-server/src/apps/api-server/app.ts
@@ -19,8 +19,9 @@ files:
   - packages/api-server-api/src/auth-procedures.ts
   - packages/api-server-api/src/harness-router.ts
   - packages/api-server-api/src/harness-context.ts
+  - packages/api-server-api/src/modules/connections/providers.ts
   - docs/architecture/platform-topology.md
-updated: 2026-06-19
+updated: 2026-06-22
 ---
 
 # api-server (package)
@@ -247,8 +248,23 @@ codec (`modules/terminal/protocol.ts`), the ACP synthetic-notification schemas
 One deliberate seam: `auth-procedures.ts` is **not** re-exported from the barrel,
 because it calls `initTRPC.create()` at module load and would drag `@trpc/server`
 into browser bundles; routers import it directly instead
-(`packages/api-server-api/src/index.ts @c307f40`, see the comment block above the
+(`packages/api-server-api/src/index.ts @9d1bc99`, see the comment block above the
 `AgentBinding` re-export).
+
+**Provider preset catalog** — `modules/connections/providers.ts` is the single
+source of truth for model-provider definitions; the server, UI, and CLI all
+derive from it (`packages/api-server-api/src/modules/connections/providers.ts:1
+@9d1bc99`). It exports `PROVIDERS` — a keyed record of `ProviderPreset` objects
+for `anthropic`, `ibm-litellm`, `openai`, and `bob` — each with a display name,
+host/path pattern, and one or more `ProviderPresetMode` entries (key, label,
+`templateId`, optional `tokenPrefix`, `defaultEnvMappings`, and
+`injection`/`extraInjections` for Envoy credential injection). The
+`PROVIDER_TEMPLATE_IDS` set (all mode `templateId` values) and
+`providerTypeForTemplateId` / `templateIdForProvider` helpers let consumers
+resolve the provider↔template relation without hand-maintaining a map
+(`packages/api-server-api/src/modules/connections/providers.ts:195-233
+@9d1bc99`). This catalog replaced per-package `provider-templates.ts` copies
+that formerly lived in both the CLI and UI.
 
 ## Where to look
 

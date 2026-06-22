@@ -1,8 +1,8 @@
 ---
 source: dam-agents/dam
-commit: c307f40480aa96788cb9c4f6a06f7e5b732e5bd7
+commit: 9d1bc9990fba55f43d60b0aad453b188af5896a8
 files: [packages/ui/package.json, packages/ui/vite.config.ts, packages/ui/index.html, packages/ui/tsconfig.json, packages/ui/src/main.tsx, packages/ui/src/app.tsx, packages/ui/src/api.ts, packages/ui/src/trpc.ts, packages/ui/src/auth.ts, packages/ui/src/store.ts, packages/ui/src/modules/platform/lib/routes.ts, packages/ui/src/modules/acp/acp.ts, packages/ui/src/modules/acp/session-projection.ts, packages/ui/src/modules/acp/utils.ts, packages/ui/src/modules/sessions/hooks/use-acp-session.ts, packages/ui/src/modules/sessions/hooks/use-acp-connection.ts, packages/ui/src/modules/sessions/components/terminal.tsx]
-updated: 2026-06-19
+updated: 2026-06-22
 ---
 
 # ui (package)
@@ -92,6 +92,19 @@ Each `modules/<domain>` folder is self-contained, typically with `api/`
 `repos`, `sandboxes`, `schedules`, `secrets`, `sessions`, `settings`,
 `templates`, `terms`, `usage`. These mirror the platform's
 [bounded contexts](../concepts/bounded-contexts.md).
+
+**Provider preset filtering.** The `connections` and `sandboxes` modules import
+`PROVIDER_TEMPLATE_IDS` directly from `api-server-api` to exclude provider
+connections (Anthropic, IBM LiteLLM, OpenAI, Bob Shell) from the generic
+connection catalog row — those connections are managed separately in the
+`providers` module and must not appear twice
+(`packages/ui/src/modules/connections/components/templates-section.tsx:4
+@9d1bc99`,
+`packages/ui/src/modules/sandboxes/components/connections-section.tsx:4
+@9d1bc99`). The local `provider-templates.ts` that previously duplicated this
+catalog in the UI was deleted; the canonical definition now lives in
+`api-server-api/src/modules/connections/providers.ts`. See
+[api-server](./api-server.md) for the provider preset catalog.
 
 ## Talking to the api-server
 

@@ -1,6 +1,6 @@
 ---
 source: dam-agents/dam
-commit: c307f40480aa96788cb9c4f6a06f7e5b732e5bd7
+commit: 9d1bc9990fba55f43d60b0aad453b188af5896a8
 files:
   - packages/cli/README.md
   - packages/cli/package.json
@@ -28,7 +28,8 @@ files:
   - packages/cli/src/modules/ssh/compose.ts
   - packages/cli/src/modules/ssh/commands/ssh.ts
   - docs/architecture/cli.md
-updated: 2026-06-19
+  - packages/cli/src/modules/agent/commands/create-interactive.ts
+updated: 2026-06-22
 ---
 
 # cli (package)
@@ -81,7 +82,13 @@ Command groups are singular to match `gh`/`git`/`docker`
   (`packages/cli/src/modules/auth/compose.ts:133-177 @c307f40`).
 - **agent** — `list` (default), `get`, `create`, `create-interactive`,
   `delete`, `restart`
-  (`packages/cli/src/modules/agent/compose.ts:60-83 @c307f40`).
+  (`packages/cli/src/modules/agent/compose.ts:60-83 @9d1bc99`). The
+  `create-interactive` flow prompts for a provider and imports
+  `PROVIDERS`, `PROVIDER_PRESET_TYPES`, `PROVIDER_TEMPLATE_IDS`, and
+  `templateIdForProvider` directly from `api-server-api` — the local
+  `provider-templates.ts` copy was removed in favour of the canonical
+  catalog (`packages/cli/src/modules/agent/commands/create-interactive.ts:14-24
+  @9d1bc99`).
 - **chat** + **session** — `dam chat <agent>` attaches your terminal to an
   agent TUI; `dam session list`
   (`packages/cli/src/modules/chat/compose.ts:51-60 @c307f40`).

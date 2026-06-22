@@ -1,13 +1,14 @@
 ---
 source: dam-agents/dam
-commit: c307f40480aa96788cb9c4f6a06f7e5b732e5bd7
+commit: 9d1bc9990fba55f43d60b0aad453b188af5896a8
 files:
   - docs/architecture/logging.md
   - packages/api-server/src/core/logger.ts
   - packages/api-server/src/core/security-log.ts
   - packages/api-server/src/index.ts
   - packages/api-server/src/modules/audit/sagas/audit-log.ts
-updated: 2026-06-19
+  - packages/controller/main.go
+updated: 2026-06-22
 ---
 
 # Logging & Audit Trail
@@ -170,6 +171,31 @@ Two **disjoint** mechanisms feed the one logger, so no event is double-logged
   the writer must never block or throw into a request path
   (`docs/architecture/logging.md:49 @c307f40`).
 
+## Controller logging
+
+The controller logs through Go's standard-library **`log/slog`**, configured
+once at startup in `setupLogger()` (`packages/controller/main.go:99-112
+@9d1bc99`). Output is one JSON object per line on **stderr** at the `LOG_LEVEL`
+level (`debug|info|warn|error`, default `info`); `debug` surfaces per-reconcile
+phase timing (`packages/controller/main.go:218,259 @9d1bc99`). As with the
+api-server, the level is the only knob — there is no per-feature toggle. Stderr
+rather than stdout reflects that controller lines are pure diagnostics, not
+program output; Kubernetes merges both streams into the one container log, so a
+collector sees it either way (`docs/architecture/logging.md:53 @9d1bc99`).
+
+**No audit trail.** The controller acts only under its own ServiceAccount
+against the K8s API, never on behalf of a user, so there is no real actor to
+attribute — the audit trail is solely an api-server concern
+(`docs/architecture/logging.md:55 @9d1bc99`).
+
+**Zero-code OTel instrumentation.** The controller registers no in-process
+OpenTelemetry SDK and no global `TracerProvider`. This keeps it ready for the
+OTel Operator's eBPF auto-instrumentation sidecar: the sidecar's `log/slog`
+probe captures the JSON records and exports them with trace correlation. Wiring
+an in-process `TracerProvider` would conflict with the injected auto-SDK and
+break that correlation, so the binary deliberately stays OTel-free
+(`docs/architecture/logging.md:57 @9d1bc99`).
+
 ## See also
 
 - [Usage tracking](../concepts/usage-tracking.md) — the pseudonymized analytics
@@ -177,3 +203,5 @@ Two **disjoint** mechanisms feed the one logger, so no event is double-logged
 - [Security & credentials](../concepts/security-and-credentials.md) — the
   decision points the audit trail records.
 - [api-server](../sources/api-server.md) — the host process.
+- [controller](../sources/controller.md) — the Go reconciler that produces
+  controller logs.
